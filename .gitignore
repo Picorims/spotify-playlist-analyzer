@@ -131,3 +131,5 @@ dmypy.json
 # ============================================
 # exclude ouptut files
 out/
+# exclude temporary folder
+temp/

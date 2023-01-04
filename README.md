@@ -26,6 +26,11 @@ py -m pip install -r requirements.txt
 deactivate
 ```
 
+## Usage
+
+- Get the playlist metadata from https://watsonbox.github.io/exportify/ (make sure to enable optional data in the settings!)
+- 
+
 ## Updating dependencies (for development purposes only)
 
 - Use pip to update dependencies
