@@ -48,6 +48,7 @@ class Columns():
 
     POPULARITY = "Popularity"
     KEY = "Key"
+    MODE = "Mode" #0 is minor, 1 is majors
     DURATION = "Track Duration (ms)"
     LOUDNESS = "Loudness"
     TEMPO = "Tempo"
@@ -154,6 +155,79 @@ def addTitle(title: str):
 playlistLength = dataFrame.shape[0]
 pdf_utils.addFirstPage(pdf, pdfPageSize, playlistFileName, playlistLength)
 print("Creating diagrams...")
+
+
+
+
+
+# ========
+# RANKINGS
+# ========
+
+print("- radar chart")
+addTitle("Average playlist profile")
+
+def buildRadarChart():
+    """
+    Creates a radar / spider chart of the average value of multiple columns
+    based on: https://www.pythoncharts.com/matplotlib/radar-charts/
+    """
+
+    # prepare data
+    columnNames = [Columns.DANCEABILITY, Columns.ENERGY, Columns.SPEECHINESS, Columns.ACOUSTICNESS, Columns.INSTRUMENTALNESS, Columns.LIVENESS, Columns.VALENCE]
+    labels = columnNames.copy()
+    labels[5] = "Liveness (performed live)"
+    labels[6] = "Valence (positivity, happiness)"
+    averages = []
+    for col in columnNames:
+        averages.append(dataFrame[col].mean())
+    nbValues = len(columnNames)
+
+    # split the circle into angles for each column
+    # false = exclude stop, tolist() to be able to append values
+    angles = np.linspace(0, 2*np.pi, nbValues, endpoint=False).tolist()
+
+    # The plot is a circle, so we need to "complete the loop"
+    # and append the start value to the end.
+    averages.append(averages[0])
+    angles.append(angles[0])
+
+    # figure
+    radarFig, radarAxes = plt.subplots(subplot_kw=dict(polar=True))
+    radarFig.set_size_inches(pdfPageSize)
+    radarAxes.set_title("Average / mean value for different parameters")
+    # max value
+    radarAxes.set_ylim(0,1)
+    # or ax.set_rgrids([20, 40, 60, 80, 100])
+    # line
+    radarAxes.plot(angles, averages, linewidth=1)
+    # fill
+    radarAxes.fill(angles, averages, alpha=0.25)
+
+    # Fix axis to go in the right order and start at 12 o'clock.
+    radarAxes.set_theta_offset(np.pi / 2) # rotate
+    radarAxes.set_theta_direction(-1) # reverse order
+
+    # Draw axis lines for each angle and label (and add the labels as well).
+    radarAxes.set_thetagrids(np.degrees(angles)[0:-1], labels)
+
+    # Go through labels and adjust alignment based on where
+    # it is in the circle.
+    for label, angle in zip(radarAxes.get_xticklabels(), angles):
+        if angle in (0, np.pi): # equals 0 or pi
+            label.set_horizontalalignment('center')
+        elif 0 < angle < np.pi:
+            label.set_horizontalalignment('left')
+        else:
+            label.set_horizontalalignment('right')
+
+    # Set position of y-labels (0-100) to be in the middle
+    # of the first two axes.
+    radarAxes.set_rlabel_position(180 / nbValues)
+
+    pdf.savefig(radarFig)
+
+buildRadarChart()
 
 
 
