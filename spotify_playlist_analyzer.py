@@ -23,8 +23,9 @@
 # Dependencies
 from datetime import datetime
 import math
-import matplotlib as mpl
+from matplotlib import colors
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.patheffects as path_effects
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -60,6 +61,9 @@ class Columns():
     LIVENESS = "Liveness"
     VALENCE = "Valence"
     
+class DataColors:
+    POPULARITY = "#19b065"
+    DURATION = "#ed5c5e"
 
 
 # Prepare temp and out dir
@@ -154,9 +158,10 @@ print("Creating diagrams...")
 
 
 
-# ==========
-# POPULARITY (between 0 and 100)
-# ==========
+
+# ============
+# DISTRIBUTION
+# ============
 
 print("- distribution")
 addTitle("Distribution")
@@ -171,7 +176,7 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
     Parameters:
     - `name`: name of the figure.
     - `distribDataColumn`: the dataFrame column to use in `dataFrame`.
-    - `min`, `max`, `step`: range that defines the bins for the histogram (min, max (included!), and step for slicing the whole range in bins).
+    - `rMin`, `rMax`, `rStep`: range that defines the bins for the histogram (min, max (included!), and step for slicing the whole range in bins).
     Note that bars will be added for all values below min and above max. 
     - `scale`: can be used to apply a factor to the ranked column (on a dataframe copy).
     - `unit`: String to display a unit next to the axis label.
@@ -212,7 +217,7 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
     finalXLabel = distribDataColumn if (xLabel == "") else xLabel
     if (not unit == ""):
         finalXLabel += f" ({unit})"
-    distribAxes.set_xlabel(distribDataColumn)
+    distribAxes.set_xlabel(finalXLabel)
     distribAxes.set_ylabel("Number of occurences")
     distribAxes.set_xlim(rMin - rStep, rMax + rStep)
 
@@ -239,7 +244,7 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
 # Popularity
 buildDistribution("How popular are the tracks of your playlist?\n(0 are niche, 100 are most streamed tracks)",
         Columns.POPULARITY,
-        rMin=0, rMax=100, rStep=5)
+        rMin=0, rMax=100, rStep=5, color=DataColors.POPULARITY)
 
 # Duration
 buildDistribution("How long are the tracks?\n",
@@ -248,14 +253,120 @@ buildDistribution("How long are the tracks?\n",
         scale=(1/60000),
         xLabel="Duration",
         unit="minutes",
-        color="#e83c3f")
+        color=DataColors.DURATION)
 
 
 
 
 
 # ========
-# RANKINGS (between 0 and 100)
+# RANKINGS
+# ========
+
+print("- crossed distribution")
+addTitle("Crossed distribution")
+
+class CrossedDistribConfig:
+    """
+    class that holds all the data for configuring one axis of the 2d histogram,
+    to make data transmission easier.
+    """
+    distribDataColumn: str
+    rMin: int
+    rMax: int
+    rStep: int
+    scale: int=1
+    unit: str=""
+    label: str=""
+
+    def __init__(self, distribDataColumn: str, rMin: int, rMax: int, rStep: int, scale: int=1, unit: str="", label: str="") -> None:
+        self.distribDataColumn = distribDataColumn
+        self.rMin = rMin
+        self.rMax = rMax
+        self.rStep = rStep
+        self.scale = scale
+        self.unit = unit
+        self.label = label
+
+
+def buildCrossedDistribution(name: str, config1: CrossedDistribConfig, config2: CrossedDistribConfig):
+    """
+    Builds a 2d histogram based on the config. Concentration of values in an area
+    is indicated by colors.
+
+    parameters:
+    - `config1`, `config2`: configuration for each axis of the 2d histogram.
+
+    config parameters:
+    - `distribDataColumn`: the dataFrame column to use in `dataFrame`.
+    - `rMin`, `rMax`, `rStep`: range that defines the bins for the histogram (min, max (included!), and step for slicing the whole range in bins).
+    Note that out of range values are ignored.
+    - `scale`: can be used to apply a factor to the ranked column (on a dataframe copy).
+    - `unit`: String to display a unit next to the axis label.
+    - `label`: override the label for the x axis with a custom one, instead of the column name.
+    """
+
+    crossedDistribDf = dataFrame[[config1.distribDataColumn, config2.distribDataColumn]]
+
+    # Bins
+    distribBins1 = np.arange(config1.rMin, config1.rMax + config1.rStep, config1.rStep) # + step ensures max (and not more) is included
+    distribBins2 = np.arange(config2.rMin, config2.rMax + config2.rStep, config2.rStep)
+
+    # figure and plotting
+    crossedDistribFig, crossedDistribAxes = plt.subplots() #1 row, 1 col
+    crossedDistribFig.set_size_inches(pdfPageSize)
+    hist, xBins, yBins, image = crossedDistribAxes.hist2d(
+            crossedDistribDf[config1.distribDataColumn].to_numpy(),
+            crossedDistribDf[config2.distribDataColumn].to_numpy(),
+            bins=(distribBins1, distribBins2),
+            cmap="viridis")
+    crossedDistribFig.colorbar(image)
+    
+    # additional information
+    crossedDistribAxes.set_title(name)
+
+    finalXLabel = config1.distribDataColumn if (config1.label == "") else config1.label
+    if (not config1.unit == ""):
+        finalXLabel += f" ({config1.unit})"
+    crossedDistribAxes.set_xlabel(finalXLabel)
+    
+    finalYLabel = config2.distribDataColumn if (config2.label == "") else config2.label
+    if (not config2.unit == ""):
+        finalYLabel += f" ({config2.unit})"
+    crossedDistribAxes.set_ylabel(finalYLabel)
+
+    # tweak axis
+    crossedDistribAxes.set_xticks(distribBins1)
+    crossedDistribAxes.set_yticks(distribBins2)
+    crossedDistribAxes.set_xlim(config1.rMin, config1.rMax)
+    crossedDistribAxes.set_ylim(config2.rMin, config2.rMax)
+
+    # print values in all bins
+    # https://stackoverflow.com/questions/43538581/printing-value-in-each-bin-in-hist2d-matplotlib
+    for i in range(len(distribBins1)-1):
+        for j in range(len(distribBins2)-1):
+            text = crossedDistribAxes.text(
+                    distribBins1[j] + config1.rStep/2,
+                    distribBins2[i] + config2.rStep/2,
+                    int(hist.T[i,j]), #T: transposed array
+                    color="white", ha="center", va="center", fontweight="bold", fontsize=16)
+            text.set_path_effects([path_effects.Stroke(linewidth=1, foreground="#00000077")])
+
+    pdf.savefig(crossedDistribFig)
+
+
+# Crossed distributions
+
+buildCrossedDistribution("Danceability vs Energy",
+        CrossedDistribConfig(Columns.DANCEABILITY, rMin=0, rMax=1, rStep=0.1),
+        CrossedDistribConfig(Columns.ENERGY, rMin=0, rMax=1, rStep=0.1))
+
+
+
+
+
+# ========
+# RANKINGS
 # ========
 
 print("- rankings")
@@ -319,8 +430,8 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
 # Rankings
 
 # Popularity
-buildRanking("Most popular tracks", Columns.POPULARITY)
-buildRanking("Least popular tracks", Columns.POPULARITY, least=True)
+buildRanking("Most popular tracks", Columns.POPULARITY, color=DataColors.POPULARITY)
+buildRanking("Least popular tracks", Columns.POPULARITY, least=True, color=DataColors.POPULARITY)
 
 #Duration
 buildRanking("Longest tracks",
@@ -328,14 +439,14 @@ buildRanking("Longest tracks",
         scale=(1/60000),
         xLabel="Duration",
         unit="minutes",
-        color="#e83c3f")
+        color=DataColors.DURATION)
 buildRanking("Shortest tracks",
         Columns.DURATION,
         least=True,
         scale=(1/60000),
         xLabel="Duration",
         unit="minutes",
-        color="#e83c3f")
+        color=DataColors.DURATION)
 
 
 
@@ -351,3 +462,8 @@ print("saving PDF...")
 pdf.close()
 
 print("done!")
+
+# TODO
+# - folder name with playlist name
+# - graph
+# - more data
