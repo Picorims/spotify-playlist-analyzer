@@ -64,6 +64,7 @@ class Columns():
     VALENCE = "Valence"
     
 class DataColors:
+    SIMILAR_TRACKS = "#5cd0ed"
     POPULARITY = "#19b065"
     DURATION = "#ed5c5e"
 
@@ -238,7 +239,7 @@ edgeLabels = {}
 for index, row in keptPairsDf.iterrows():
     edgeLabels[(row[0], row[1])] = round(row[GLOB_DIST_COL] * 100)
 
-nx.draw(graph, graphPos, ax=graphAxes, with_labels=True, alpha=0.5, font_size=8, node_size=250)
+nx.draw(graph, graphPos, ax=graphAxes, with_labels=True, alpha=0.5, font_size=8, node_size=250, node_color=DataColors.SIMILAR_TRACKS)
 # for bbox see
 # https://matplotlib.org/stable/gallery/text_labels_and_annotations/placing_text_boxes.html
 # https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.Patch.html#matplotlib.patches.Patch
@@ -592,7 +593,60 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
     pdf.savefig(rankFig)
 
 
+def buildSimilarTracksRanking(name: str, maxRows: int=20, least: bool=False, scale: int=1, xLabel: str="", color: str="C0"):
+    """
+    Builds a ranking of similar tracks
+
+    Parameters:
+    - `name`: name of the figure.
+    - `sortingColumn`: the dataFrame column to use in `dataFrame`.
+    - `maxRows`: The maximum of tracks displayed in the figure.
+    - `least`: Sort by lowest values instead of highest values.
+    - `scale`: can be used to apply a factor to the ranked column (on a dataframe copy).
+    - `xlabel`: override the label for the x axis with a custom one, instead of the column name.
+    - `color`: Sets the bars color
+    """
+    # setup and style
+    rankFig, rankAxes = plt.subplots()
+    rankFig.set_size_inches(pdfPageSize)
+    rankFig.subplots_adjust(left=0.50)
+
+    # get ranking
+    sortingColumn = GLOB_DIST_COL
+    rankDf = pairsDf[[0, 1, sortingColumn]].copy()
+    # scaling
+    rankDf[sortingColumn] *= scale
+    if (not least):
+        # most
+        rankDf = rankDf.sort_values(sortingColumn).tail(maxRows)
+    else:
+        # least
+        #[::-1] reverses the list, see https://www.codingem.com/reverse-slicing-in-python/
+        rankDf = rankDf.sort_values(sortingColumn).head(maxRows).iloc[::-1]
+
+    # build list of labels and values
+    rankLabels = []
+    for index, row in rankDf.iterrows():
+        label = f"{row[0]} and {row[1]}"
+        rankLabels.append(label)
+    rankValues = rankDf[sortingColumn].to_numpy()
+
+    # create plot and append information
+    barContainer = rankAxes.barh(rankLabels, rankValues, color=color) # inverts order of dataframe on display
+    rankAxes.bar_label(barContainer, padding=2)
+    rankAxes.set_title(name)
+    label = sortingColumn if (xLabel == "") else xLabel
+    rankAxes.set_xlabel(label)
+
+    pdf.savefig(rankFig)
+
+
+
 # Rankings
+
+# Similar tracks
+buildSimilarTracksRanking("Most similar tracks", least=True, color=DataColors.SIMILAR_TRACKS)
+buildSimilarTracksRanking("Least similar tracks", color=DataColors.SIMILAR_TRACKS)
 
 # Popularity
 buildRanking("Most popular tracks", Columns.POPULARITY, color=DataColors.POPULARITY)
