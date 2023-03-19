@@ -22,11 +22,12 @@
 
 # Dependencies
 from datetime import datetime
+from itertools import product
 import math
-from matplotlib import colors
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.patheffects as path_effects
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import os
 import pandas as pd
@@ -89,6 +90,9 @@ os.mkdir(outDir)
 
 
 # copy and prepare csv file
+if (len(sys.argv) != 2):
+    print("syntax: spotify-playlist-analyzer <csv_file>")
+    exit(1)
 
 print("Preparing CSV loading...")
 csvPath = os.path.join(tempDir, "data.csv")
@@ -147,6 +151,7 @@ playlistFileName = os.path.split(playlistFileNoExtension)[1]
 pdfName = "stats_playlist_" + playlistFileName + ".pdf"
 pdf = PdfPages(os.path.join(outDir, pdfName))
 pdfPageSize = (math_utils.mmToInches(210), math_utils.mmToInches(148)) # A5
+pdfNetworkPageSize = (math_utils.mmToInches(594), math_utils.mmToInches(594)) # A2 length
 
 def addTitle(title: str):
     """Append a title page to the pdf."""
@@ -160,9 +165,95 @@ print("Creating diagrams...")
 
 
 
-# ========
-# RANKINGS
-# ========
+# =======
+# NETWORK
+# =======
+print("- network of similar tracks")
+addTitle("Network of similar tracks")
+
+percentageColumns = [Columns.DANCEABILITY, Columns.ENERGY, Columns.SPEECHINESS, Columns.ACOUSTICNESS, Columns.INSTRUMENTALNESS, Columns.LIVENESS, Columns.VALENCE]
+
+# get all possible pairs of indexes
+pairsDf = pd.DataFrame(product(dataFrame.index, dataFrame.index))
+
+# remove duplicates (x, x), as it doesn't make sense to compare a track to itself
+# remove pair "duplicates", as (x,y) and (y,x) is the same comparison
+
+# removes all indexes of pairsDf (different from the original dataframe indexes)
+# indicated in the provideed list. The provided list is the list of indexes where
+# the condition is respected.
+pairsDf = pairsDf.drop(pairsDf[pairsDf[0] >= pairsDf[1]].index)
+
+# add metadata used for calculations: map each pair index to its value in the dataframe,
+# in a column labeled as "label_name + index column" (0 or 1)
+
+# ex: for Danceability on (0,2),
+# Danceability0 = df[Danceability][0] (value at index 0)
+# and Danceability1 = df[Danceability][2]
+distanceColumns = []
+for col in percentageColumns:
+    for i in range(0,2):
+        pairsDf[col+str(i)] = pairsDf[i].apply(lambda x: dataFrame[col][x])
+    # calculate distance between both values
+    distCol = col+"_Distance"
+    distanceColumns.append(distCol)
+    pairsDf[distCol] = abs(pairsDf[col+"0"] - pairsDf[col+"1"])
+
+# calculate global distance for all pairs
+GLOB_DIST_COL = "Global_Distance"
+pairsDf[GLOB_DIST_COL] = pairsDf[distanceColumns].sum(axis=1) # horizontal sum instead of vertical
+
+# keep only the smallest distances
+#pairsDf = pairsDf.sort_values(GLOB_DIST_COL).head(playlistLength) # keep as many arcs as the number of tracks times x
+
+# keep atleast one edge for each node
+pairsDf = pairsDf.sort_values(GLOB_DIST_COL)
+
+keptPairsDf = pd.DataFrame(columns=[0, 1, GLOB_DIST_COL])
+edgesCountPerIndex = [0] * playlistLength # 0 for each index
+MAX_EDGES_PER_INDEX = 2
+
+for index, row in pairsDf.iterrows():
+    i0 = int(row[0])
+    i1 = int(row[1])
+    count0 = edgesCountPerIndex[i0]
+    count1 = edgesCountPerIndex[i1]
+    if (count0 < MAX_EDGES_PER_INDEX or count1 < MAX_EDGES_PER_INDEX):
+        # add if one of the index has no edge
+        keptPairsDf.loc[len(keptPairsDf)] = [i0, i1, row[GLOB_DIST_COL]]
+        edgesCountPerIndex[i0] += 1
+        edgesCountPerIndex[i1] += 1
+
+# build network
+graph = nx.Graph()
+# add vertices
+graph.add_nodes_from(list(range(playlistLength)))
+# add arcs
+graph.add_edges_from(keptPairsDf[[0, 1]].to_numpy())
+# draw
+graphFig, graphAxes = plt.subplots()
+graphFig.set_size_inches(pdfNetworkPageSize)
+graphPos = nx.spring_layout(graph) # k (0 to 1) controls the distance between nodes, defaults to 0.1
+edgeLabels = {}
+for index, row in keptPairsDf.iterrows():
+    edgeLabels[(row[0], row[1])] = round(row[GLOB_DIST_COL] * 100)
+
+nx.draw(graph, graphPos, ax=graphAxes, with_labels=True, alpha=0.5, font_size=8, node_size=250)
+# for bbox see
+# https://matplotlib.org/stable/gallery/text_labels_and_annotations/placing_text_boxes.html
+# https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.Patch.html#matplotlib.patches.Patch
+nx.draw_networkx_edge_labels(graph, graphPos, ax=graphAxes, edge_labels=edgeLabels, font_size=6, label_pos=0.35, bbox=dict(color='white', alpha = 0.15))
+graphAxes.set_title("Network of similar tracks:\nclosest tracks (nodes) have an arc in between them")
+
+pdf.savefig(graphFig)
+
+
+
+
+
+# ===========
+# RADAR CHART
+# ===========
 
 print("- radar chart")
 addTitle("Average playlist profile")
@@ -174,7 +265,7 @@ def buildRadarChart():
     """
 
     # prepare data
-    columnNames = [Columns.DANCEABILITY, Columns.ENERGY, Columns.SPEECHINESS, Columns.ACOUSTICNESS, Columns.INSTRUMENTALNESS, Columns.LIVENESS, Columns.VALENCE]
+    columnNames = percentageColumns.copy()
     labels = columnNames.copy()
     labels[5] = "Liveness (performed live)"
     labels[6] = "Valence (positivity, happiness)"
@@ -539,5 +630,4 @@ print("done!")
 
 # TODO
 # - folder name with playlist name
-# - graph
 # - more data
