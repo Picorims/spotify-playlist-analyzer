@@ -101,7 +101,7 @@ os.mkdir(tempDir)
 if not os.path.exists(globalOutDir):
     os.mkdir(globalOutDir)
 
-outDir = os.path.join(globalOutDir, datetime.now().strftime("%d-%m-%Y_%H-%M-%S_%f"))
+outDir = os.path.join(globalOutDir, datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f"))
 os.mkdir(outDir)
 
 
