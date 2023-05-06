@@ -65,8 +65,25 @@ class Columns():
     
 class DataColors:
     SIMILAR_TRACKS = "#5cd0ed"
+
     POPULARITY = "#19b065"
+    KEY = "#35606d"
+    MODE = "#0e3d4b"
     DURATION = "#ed5c5e"
+    LOUDNESS = "#570202"
+    TEMPO = "#5f5f5f"
+    TIME_SIGNATURE = "#272727"
+
+    DANCEABILITY = "#853d9b"
+    ENERGY = "#f58f2f"
+    SPEECHINESS = "#15c7a0"
+    ACOUSTICNESS = "#b48a52"
+    INSTRUMENTALNESS = "#e489dc"
+    LIVENESS = "#d63693"
+    VALENCE = "#e0b010"
+
+percentageColumns = [Columns.DANCEABILITY, Columns.ENERGY, Columns.SPEECHINESS, Columns.ACOUSTICNESS, Columns.INSTRUMENTALNESS, Columns.LIVENESS, Columns.VALENCE]
+percentageColumnsAllCaps = ["DANCEABILITY", "ENERGY", "SPEECHINESS", "ACOUSTICNESS", "INSTRUMENTALNESS", "LIVENESS", "VALENCE"]
 
 
 # Prepare temp and out dir
@@ -172,8 +189,6 @@ print("Creating diagrams...")
 print("- network of similar tracks")
 addTitle("Network of similar tracks")
 
-percentageColumns = [Columns.DANCEABILITY, Columns.ENERGY, Columns.SPEECHINESS, Columns.ACOUSTICNESS, Columns.INSTRUMENTALNESS, Columns.LIVENESS, Columns.VALENCE]
-
 # get all possible pairs of indexes
 pairsDf = pd.DataFrame(product(dataFrame.index, dataFrame.index))
 
@@ -267,9 +282,17 @@ def buildRadarChart():
 
     # prepare data
     columnNames = percentageColumns.copy()
-    labels = columnNames.copy()
-    labels[5] = "Liveness (performed live)"
-    labels[6] = "Valence (positivity, happiness)"
+    # labels = columnNames.copy() # Technically unused...
+    labels = []
+    # see https://developer.spotify.com/documentation/web-api/reference/get-several-audio-features
+    # ORDER IS IMPORTANT
+    labels.append("Danceability (suitable for dancing)")
+    labels.append("Energy (intensity and activity)")
+    labels.append("Speechiness\n(spoken words,\n>0.66 => almost\nonly words (ex: podcast),\n<0.33 => almost\nonly music)")
+    labels.append("Acousticness (not electronic instruments)")
+    labels.append("Instrumentalness (no vocals)")
+    labels.append("Liveness (performed live)")
+    labels.append("Valence (positivity, happiness)")
     averages = []
     for col in columnNames:
         averages.append(dataFrame[col].mean())
@@ -318,6 +341,7 @@ def buildRadarChart():
     radarAxes.set_rlabel_position(180 / nbValues)
 
     pdf.savefig(radarFig)
+    plt.close(radarFig)
 
 buildRadarChart()
 
@@ -332,7 +356,7 @@ buildRadarChart()
 print("- distribution")
 addTitle("Distribution")
 
-def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, rStep: int, scale: int=1, unit: str="", xLabel: str="", color: str="C0"):
+def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, rStep: int, scale: int=1, scaleOnlyDisplay: bool=True, unit: str="", xLabel: str="", color: str="C0"):
     """
     Builds an histogram with the given name,
     displaying the distribution of values for the given column.
@@ -345,12 +369,17 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
     - `rMin`, `rMax`, `rStep`: range that defines the bins for the histogram (min, max (included!), and step for slicing the whole range in bins).
     Note that bars will be added for all values below min and above max. 
     - `scale`: can be used to apply a factor to the ranked column (on a dataframe copy).
+    - `scaleOnlyDisplay`: if false, data is scaled before being processed. If true, only the displayed text is altered. It is useful for ranges such as [0;1] to be usable.
     - `unit`: String to display a unit next to the axis label.
     - `xlabel`: override the label for the x axis with a custom one, instead of the column name.
     - `color`: Sets the bars color
     """
 
-    distribDf = dataFrame[distribDataColumn]
+    print(".", end="")
+
+    distribDf = dataFrame[[distribDataColumn]].copy()
+    if not scaleOnlyDisplay:
+        distribDf[distribDataColumn] *= scale
 
     # Bins
     distribBins = np.arange(rMin, rMax+1, rStep)
@@ -358,8 +387,8 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
     # to show values below min and above max with bars on the sides of the chart
     maxBin = max(rMax, math.ceil(distribDf.max())) # if the order is broken because (data_max < rMax), hist() will fail
     minBin = min(rMin, math.floor(distribDf.min()))
-    distribBins = np.append(distribBins, maxBin)
-    distribBins = np.insert(distribBins, 0, minBin)
+    distribBins = np.append(distribBins, maxBin) # max bin to the end
+    distribBins = np.insert(distribBins, 0, minBin) # min bin to the start
 
     # figure and plotting
     distribFig, distribAxes = plt.subplots() #1 row, 1 col
@@ -389,7 +418,9 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
 
     # tweak x axis ticks
     # scaling first (scaling the ticks is sufficient for the chart to remain accurate, and is simpler)
-    xTicks = distribBins[1:-1] * scale # exclude min and max added above, they should not be displayed.
+    xTicks = distribBins[1:-1] # exclude min and max added above, they should not be displayed.
+    if scaleOnlyDisplay:
+        xTicks = xTicks * scale
     xTicks = xTicks.astype(str) 
     # then adding text for indicating above n and below n more explicitely
     # xTicks[0] = f"<{xTicks[0]} | {xTicks[0]}"
@@ -403,23 +434,67 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
     # see also: https://stackoverflow.com/questions/26218704/matplotlib-histogram-with-collection-bin-for-high-values
 
     pdf.savefig(distribFig)
+    plt.close(distribFig)
 
 
 # Distributions
 
 # Popularity
 buildDistribution("How popular are the tracks of your playlist?\n(0 are niche, 100 are most streamed tracks)",
-        Columns.POPULARITY,
-        rMin=0, rMax=100, rStep=5, color=DataColors.POPULARITY)
+                  Columns.POPULARITY,
+                  rMin=0, rMax=100, rStep=5,
+                  color=DataColors.POPULARITY)
 
 # Duration
-buildDistribution("How long are the tracks?\n",
-        Columns.DURATION,
-        rMin=60_000, rMax=60_000*10, rStep=30_000,
-        scale=(1/60000),
-        xLabel="Duration",
-        unit="minutes",
-        color=DataColors.DURATION)
+buildDistribution("How long are the tracks?",
+                  Columns.DURATION,
+                  rMin=60_000, rMax=60_000*10, rStep=30_000,
+                  scale=(1/60000),
+                  xLabel="Duration",
+                  unit="minutes",
+                  color=DataColors.DURATION)
+
+# Key
+buildDistribution(f"Key distribution (0 (fist bar) is C, 1 is C#, etc. and -1 if unknown).\nFor such histograms (1 bar per unit), read the value to the left of the bar.",
+                  Columns.KEY,
+                  rMin=0, rMax=12, rStep=1,
+                  color=DataColors.KEY)
+
+# Mode
+buildDistribution(f"Mode distribution (1 is major, 0 is minor)",
+                  Columns.MODE,
+                  rMin=0, rMax=2, rStep=1,
+                  color=DataColors.MODE)
+
+# Loudness
+buildDistribution(f"How loud are the tracks?",
+                  Columns.LOUDNESS,
+                  rMin=-60, rMax=0, rStep=5,
+                  unit="dB",
+                  color=DataColors.LOUDNESS)
+
+# Tempo
+buildDistribution(f"How fast are the tracks?",
+                  Columns.TEMPO,
+                  rMin=50, rMax=200, rStep=10,
+                  color=DataColors.TEMPO)
+
+# Time Signature
+buildDistribution(f"What is the estimated time signature of the tracks?\n(3/4 to 7/4, value to the left of the bar)",
+                  Columns.TIME_SIGNATURE,
+                  rMin=3, rMax=7, rStep=1,
+                  color=DataColors.TIME_SIGNATURE)
+
+# Percentages
+for percentage in percentageColumnsAllCaps:
+    buildDistribution(f"Amount of {getattr(Columns, percentage)} in the tracks.\n See the profile radar chart for the meaning.",
+                      getattr(Columns, percentage),
+                      rMin=0, rMax=100, rStep=5,
+                      scale=100,
+                      scaleOnlyDisplay=False,
+                      color=getattr(DataColors, percentage))
+    
+print()
 
 
 
@@ -472,6 +547,8 @@ def buildCrossedDistribution(name: str, config1: CrossedDistribConfig, config2: 
     - `label`: override the label for the x axis with a custom one, instead of the column name.
     """
 
+    print(".", end="")
+
     crossedDistribDf = dataFrame[[config1.distribDataColumn, config2.distribDataColumn]]
 
     # Bins
@@ -519,6 +596,7 @@ def buildCrossedDistribution(name: str, config1: CrossedDistribConfig, config2: 
             text.set_path_effects([path_effects.Stroke(linewidth=1, foreground="#00000077")])
 
     pdf.savefig(crossedDistribFig)
+    plt.close(crossedDistribFig)
 
 
 # Crossed distributions
@@ -526,6 +604,8 @@ def buildCrossedDistribution(name: str, config1: CrossedDistribConfig, config2: 
 buildCrossedDistribution("Danceability vs Energy",
         CrossedDistribConfig(Columns.DANCEABILITY, rMin=0, rMax=1, rStep=0.1),
         CrossedDistribConfig(Columns.ENERGY, rMin=0, rMax=1, rStep=0.1))
+
+print()
 
 
 
@@ -554,6 +634,9 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
     - `xlabel`: override the label for the x axis with a custom one, instead of the column name.
     - `color`: Sets the bars color
     """
+    
+    print(".", end="")
+
     # setup and style
     rankFig, rankAxes = plt.subplots()
     rankFig.set_size_inches(pdfPageSize)
@@ -591,6 +674,7 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
     rankAxes.set_xlabel(label)
 
     pdf.savefig(rankFig)
+    plt.close(rankFig)
 
 
 def buildSimilarTracksRanking(name: str, maxRows: int=20, least: bool=False, scale: int=1, xLabel: str="", color: str="C0"):
@@ -639,6 +723,7 @@ def buildSimilarTracksRanking(name: str, maxRows: int=20, least: bool=False, sca
     rankAxes.set_xlabel(label)
 
     pdf.savefig(rankFig)
+    plt.close(rankFig)
 
 
 
@@ -667,6 +752,7 @@ buildRanking("Shortest tracks",
         unit="minutes",
         color=DataColors.DURATION)
 
+print()
 
 
 
