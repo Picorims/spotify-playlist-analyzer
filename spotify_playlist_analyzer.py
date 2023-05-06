@@ -375,7 +375,7 @@ def buildDistribution(name: str, distribDataColumn: str, rMin: int, rMax: int, r
     - `color`: Sets the bars color
     """
 
-    print(".", end="")
+    print(".", end="", flush=True)
 
     distribDf = dataFrame[[distribDataColumn]].copy()
     if not scaleOnlyDisplay:
@@ -547,7 +547,7 @@ def buildCrossedDistribution(name: str, config1: CrossedDistribConfig, config2: 
     - `label`: override the label for the x axis with a custom one, instead of the column name.
     """
 
-    print(".", end="")
+    print(".", end="", flush=True)
 
     crossedDistribDf = dataFrame[[config1.distribDataColumn, config2.distribDataColumn]]
 
@@ -589,9 +589,9 @@ def buildCrossedDistribution(name: str, config1: CrossedDistribConfig, config2: 
     for i in range(len(distribBins1)-1):
         for j in range(len(distribBins2)-1):
             text = crossedDistribAxes.text(
-                    distribBins1[j] + config1.rStep/2,
-                    distribBins2[i] + config2.rStep/2,
-                    int(hist.T[i,j]), #T: transposed array
+                    distribBins1[i] + config1.rStep/2,
+                    distribBins2[j] + config2.rStep/2,
+                    int(hist.T[j,i]), #T: transposed array
                     color="white", ha="center", va="center", fontweight="bold", fontsize=16)
             text.set_path_effects([path_effects.Stroke(linewidth=1, foreground="#00000077")])
 
@@ -601,9 +601,27 @@ def buildCrossedDistribution(name: str, config1: CrossedDistribConfig, config2: 
 
 # Crossed distributions
 
-buildCrossedDistribution("Danceability vs Energy",
-        CrossedDistribConfig(Columns.DANCEABILITY, rMin=0, rMax=1, rStep=0.1),
-        CrossedDistribConfig(Columns.ENERGY, rMin=0, rMax=1, rStep=0.1))
+# Percentages
+crossedPairsDone = []
+for percentageA in percentageColumns:
+    for percentageB in percentageColumns:
+        # done ?
+        done = False
+        for pair in crossedPairsDone:
+            if ((pair[0] == percentageA and pair[1] == percentageB) or (pair[0] == percentageB and pair[1] == percentageA)):
+                done = True
+                break
+        
+        if not (percentageA == percentageB) and not done:
+            crossedPairsDone.append((percentageA, percentageB))
+            buildCrossedDistribution(f"{percentageA} vs {percentageB}",
+                    CrossedDistribConfig(percentageA, rMin=0, rMax=1, rStep=0.1),
+                    CrossedDistribConfig(percentageB, rMin=0, rMax=1, rStep=0.1))
+
+# Key and mode
+buildCrossedDistribution(f"Key vs Mode",
+        CrossedDistribConfig(Columns.KEY, rMin=0, rMax=12, rStep=1),
+        CrossedDistribConfig(Columns.MODE, rMin=0, rMax=2, rStep=1))
 
 print()
 
@@ -635,7 +653,7 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
     - `color`: Sets the bars color
     """
     
-    print(".", end="")
+    print(".", end="", flush=True)
 
     # setup and style
     rankFig, rankAxes = plt.subplots()
