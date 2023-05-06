@@ -84,6 +84,7 @@ class DataColors:
 
 percentageColumns = [Columns.DANCEABILITY, Columns.ENERGY, Columns.SPEECHINESS, Columns.ACOUSTICNESS, Columns.INSTRUMENTALNESS, Columns.LIVENESS, Columns.VALENCE]
 percentageColumnsAllCaps = ["DANCEABILITY", "ENERGY", "SPEECHINESS", "ACOUSTICNESS", "INSTRUMENTALNESS", "LIVENESS", "VALENCE"]
+percentageColumnsAdjectives = ["danceable", "energetic", "talkative", "acoustic", "instrumental", "live", "positive"]
 
 
 # Prepare temp and out dir
@@ -684,6 +685,8 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
 
     # create plot and append information
     barContainer = rankAxes.barh(rankLabels, rankValues, color=color) # inverts order of dataframe on display
+    if (max(rankValues) < 0): # invert if negative to stay consistent
+        rankAxes.invert_xaxis()
     rankAxes.bar_label(barContainer, padding=2)
     rankAxes.set_title(name)
     label = sortingColumn if (xLabel == "") else xLabel
@@ -751,10 +754,6 @@ def buildSimilarTracksRanking(name: str, maxRows: int=20, least: bool=False, sca
 buildSimilarTracksRanking("Most similar tracks", least=True, color=DataColors.SIMILAR_TRACKS)
 buildSimilarTracksRanking("Least similar tracks", color=DataColors.SIMILAR_TRACKS)
 
-# Popularity
-buildRanking("Most popular tracks", Columns.POPULARITY, color=DataColors.POPULARITY)
-buildRanking("Least popular tracks", Columns.POPULARITY, least=True, color=DataColors.POPULARITY)
-
 #Duration
 buildRanking("Longest tracks",
         Columns.DURATION,
@@ -769,6 +768,30 @@ buildRanking("Shortest tracks",
         xLabel="Duration",
         unit="minutes",
         color=DataColors.DURATION)
+
+# Basic ranking
+rankingColumns = ["POPULARITY", "LOUDNESS", "TEMPO"] + percentageColumnsAllCaps
+rankingAdjectives = ["popular", "loud", "fast"] + percentageColumnsAdjectives
+rankingUnits = ["", "dB", "BPM"]
+rankingScales = [1, 1, 1]
+for percentage in percentageColumnsAllCaps:
+    rankingUnits.append("%")
+    rankingScales.append(100)
+
+for i in range(len(rankingColumns)):
+    adj = rankingAdjectives[i]
+    column = rankingColumns[i]
+
+    buildRanking(f"Most {adj} tracks", getattr(Columns, column),
+                 color=getattr(DataColors, column),
+                 unit=rankingUnits[i],
+                 scale=rankingScales[i])
+    
+    buildRanking(f"Least {adj} tracks", getattr(Columns, column),
+                 color=getattr(DataColors, column),
+                 least=True,
+                 unit=rankingUnits[i],
+                 scale=rankingScales[i])
 
 print()
 
