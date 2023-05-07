@@ -33,6 +33,7 @@ import os
 import pandas as pd
 import shutil
 import sys
+from wordcloud import WordCloud
 
 # Other project modules
 import math_utils
@@ -171,6 +172,7 @@ pdfName = "stats_playlist_" + playlistFileName + ".pdf"
 pdf = PdfPages(os.path.join(outDir, pdfName))
 pdfPageSize = (math_utils.mmToInches(210), math_utils.mmToInches(148)) # A5
 pdfNetworkPageSize = (math_utils.mmToInches(594), math_utils.mmToInches(594)) # A2 length
+pdfWordCloudPageSize = (math_utils.mmToInches(297), math_utils.mmToInches(210)) # A4
 
 def addTitle(title: str):
     """Append a title page to the pdf."""
@@ -263,6 +265,55 @@ nx.draw_networkx_edge_labels(graph, graphPos, ax=graphAxes, edge_labels=edgeLabe
 graphAxes.set_title("Network of similar tracks:\nclosest tracks (nodes) have an arc in between them")
 
 pdf.savefig(graphFig)
+
+
+
+
+
+# =================
+# GENRES WORD CLOUD
+# =================
+
+print("- genre word cloud")
+addTitle("Genres (approximation\nfrom artist genres)\nFull list available in a file")
+
+artistGenresDf = dataFrame[[Columns.ARTIST_GENRES]]
+genresList = {}
+genresStr = ""
+for index, row in artistGenresDf.iterrows():
+    genresStr += f",{str(row[0])}".replace("nan","")
+    ArtistGenresList = str(row[0]).split(",")
+    for g in ArtistGenresList:
+        if (g != "nan"):
+            if g in genresList:
+                genresList[g] += 1
+            else:
+                genresList[g] = 1
+
+# iloc reverses the order to have values in descending order.
+genresDf = pd.DataFrame(genresList.items(), columns=["Genre", "Count"]).sort_values("Count").iloc[::-1]
+
+# CSV
+genresDf.index.name = "index"
+genresDf.to_csv(os.path.join(outDir, "genres.csv"))
+
+# word cloud - genres
+wordcloud = WordCloud(width=900,height=500,background_color='white').generate_from_frequencies(frequencies=genresList)
+genresFig, genresAxes = plt.subplots() #1 row, 1 col
+genresFig.set_size_inches(pdfWordCloudPageSize)
+genresAxes.imshow(wordcloud, interpolation="bilinear")
+genresAxes.set_axis_off()
+pdf.savefig(genresFig)
+plt.close(genresFig)
+
+# word cloud - genres words
+wordcloud = WordCloud(width=900,height=500,background_color='white').generate_from_text(genresStr)
+genreWordsFig, genreWordsAxes = plt.subplots() #1 row, 1 col
+genreWordsFig.set_size_inches(pdfWordCloudPageSize)
+genreWordsAxes.imshow(wordcloud, interpolation="bilinear")
+genreWordsAxes.set_axis_off()
+pdf.savefig(genreWordsFig)
+plt.close(genreWordsFig)
 
 
 
