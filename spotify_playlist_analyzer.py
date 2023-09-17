@@ -96,8 +96,12 @@ currentDir = os.getcwd()
 tempDir = os.path.join(currentDir, "temp")
 globalOutDir = os.path.join(currentDir, "out")
 
-playlistFileNoExtension = os.path.splitext(sys.argv[1])[0]
+playlistFileNoExtension = os.path.splitext(sys.argv[1])[0] # [path, ext]
 playlistFileName = os.path.split(playlistFileNoExtension)[-1]
+
+if os.path.splitext(sys.argv[1])[1] != ".csv":
+    print("File is not a CSV file.")
+    exit(1)
 
 if os.path.exists(tempDir):
     shutil.rmtree(tempDir)
@@ -116,7 +120,11 @@ os.mkdir(outDir)
 
 # copy and prepare csv file
 if (len(sys.argv) != 2):
-    print("syntax: spotify-playlist-analyzer <csv_file>")
+    print("syntax: spotify_playlist_analyzer.py <csv_file>")
+    exit(1)
+
+if not os.path.exists(sys.argv[1]):
+    print("CSV file does not exist.")
     exit(1)
 
 print("Preparing CSV loading...")

@@ -35,6 +35,10 @@ deactivate
 py spotify_playlist_analyzer.py <path_to_csv>
 ```
 - The output is in the `out` folder of the project, in a folder named after the current time.
+- For bulk processing:
+```
+py bulk_process.py <directory>
+```
 
 ## Updating dependencies (for development purposes only)
 
