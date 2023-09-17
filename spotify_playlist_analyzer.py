@@ -66,6 +66,7 @@ class Columns():
     
 class DataColors:
     SIMILAR_TRACKS = "#5cd0ed"
+    GENRE = "#6f0d96"
 
     POPULARITY = "#19b065"
     KEY = "#35606d"
@@ -276,26 +277,39 @@ pdf.savefig(graphFig)
 
 print("- genre word cloud")
 addTitle("Genres (approximation\nfrom artist genres)\nFull list available in a file")
+addTitle("Genres word cloud")
 
 artistGenresDf = dataFrame[[Columns.ARTIST_GENRES]]
 genresList = {}
+genresWordList = {}
 genresStr = ""
 for index, row in artistGenresDf.iterrows():
-    genresStr += f",{str(row[0])}".replace("nan","")
+    # genresStr += f",{str(row[0])}".replace("nan","") # old str method
     ArtistGenresList = str(row[0]).split(",")
+    ArtistWordsList = []
     for g in ArtistGenresList:
         if (g != "nan"):
+            ArtistWordsList += g.split(" ")
             if g in genresList:
                 genresList[g] += 1
             else:
                 genresList[g] = 1
 
+    for w in ArtistWordsList:
+        if w in genresWordList:
+            genresWordList[w] += 1
+        else:
+            genresWordList[w] = 1
+
 # iloc reverses the order to have values in descending order.
 genresDf = pd.DataFrame(genresList.items(), columns=["Genre", "Count"]).sort_values("Count").iloc[::-1]
+genreWordsDf = pd.DataFrame(genresWordList.items(), columns=["Genre Word", "Count"]).sort_values("Count").iloc[::-1]
 
 # CSV
 genresDf.index.name = "index"
 genresDf.to_csv(os.path.join(outDir, "genres.csv"))
+genreWordsDf.index.name = "index"
+genreWordsDf.to_csv(os.path.join(outDir, "genre_words.csv"))
 
 # word cloud - genres
 wordcloud = WordCloud(width=900,height=500,background_color='white').generate_from_frequencies(frequencies=genresList)
@@ -306,8 +320,11 @@ genresAxes.set_axis_off()
 pdf.savefig(genresFig)
 plt.close(genresFig)
 
+addTitle("Genre words - word cloud")
+
 # word cloud - genres words
-wordcloud = WordCloud(width=900,height=500,background_color='white').generate_from_text(genresStr)
+# wordcloud = WordCloud(width=900,height=500,background_color='white').generate_from_text(genresStr) # old str method
+wordcloud = WordCloud(width=900,height=500,background_color='white').generate_from_frequencies(frequencies=genresWordList)
 genreWordsFig, genreWordsAxes = plt.subplots() #1 row, 1 col
 genreWordsFig.set_size_inches(pdfWordCloudPageSize)
 genreWordsAxes.imshow(wordcloud, interpolation="bilinear")
@@ -688,7 +705,7 @@ print()
 print("- rankings")
 addTitle("Rankings")
 
-def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=False, scale: int=1, unit: str="", xLabel: str="", color: str="C0"):
+def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=False, scale: int=1, unit: str="", xLabel: str="", color: str="C0", df=dataFrame, rankedColumn=Columns.TRACK_NAME):
     """
     Builds an horizontal bar chart with the given name,
     displaying a list of highest or lowest values of a given column.
@@ -703,6 +720,8 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
     - `unit`: String to display a unit next to the axis label.
     - `xlabel`: override the label for the x axis with a custom one, instead of the column name.
     - `color`: Sets the bars color
+    - `df`: dataframe to use
+    - `rankedColumn`: column being sorted and displayed
     """
     
     print(".", end="", flush=True)
@@ -713,7 +732,7 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
     rankFig.subplots_adjust(left=0.50)
 
     # get ranking
-    rankDf = dataFrame[[Columns.TRACK_NAME, sortingColumn]].copy()
+    rankDf = df[[rankedColumn, sortingColumn]].copy()
     # scaling
     rankDf[sortingColumn] *= scale
     if (not least):
@@ -728,7 +747,7 @@ def buildRanking(name: str, sortingColumn: str, maxRows: int=20, least: bool=Fal
     rankLabels = []
     STR_MAX_LEN = 50
     for index, row in rankDf.iterrows():
-        label = f"{index} - {row[Columns.TRACK_NAME]}"
+        label = f"{index} - {row[rankedColumn]}"
         if len(label) > STR_MAX_LEN:
             label = label[0:STR_MAX_LEN] + "..."
         rankLabels.append(label)
@@ -819,6 +838,35 @@ buildRanking("Shortest tracks",
         xLabel="Duration",
         unit="minutes",
         color=DataColors.DURATION)
+
+#Genres
+buildRanking("Most common genres",
+        df=genresDf,
+        rankedColumn="Genre",
+        sortingColumn="Count",
+        xLabel="Count",
+        color=DataColors.GENRE)
+buildRanking("Least common genres",
+        df=genresDf,
+        rankedColumn="Genre",
+        sortingColumn="Count",
+        least=True,
+        xLabel="Count",
+        color=DataColors.GENRE)
+
+buildRanking("Most common genre words",
+        df=genreWordsDf,
+        rankedColumn="Genre Word",
+        sortingColumn="Count",
+        xLabel="Count",
+        color=DataColors.GENRE)
+buildRanking("Least common genre words",
+        df=genreWordsDf,
+        rankedColumn="Genre Word",
+        sortingColumn="Count",
+        least=True,
+        xLabel="Count",
+        color=DataColors.GENRE)
 
 # Basic ranking
 rankingColumns = ["POPULARITY", "LOUDNESS", "TEMPO"] + percentageColumnsAllCaps
