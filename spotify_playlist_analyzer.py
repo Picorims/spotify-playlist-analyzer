@@ -67,6 +67,7 @@ class Columns():
 class DataColors:
     SIMILAR_TRACKS = "#5cd0ed"
     GENRE = "#6f0d96"
+    ARTIST = "#06806b"
 
     POPULARITY = "#19b065"
     KEY = "#35606d"
@@ -867,6 +868,32 @@ buildRanking("Least common genre words",
         least=True,
         xLabel="Count",
         color=DataColors.GENRE)
+
+# Artists
+artistsDf = dataFrame[[Columns.ARTIST_NAMES]]
+artistsList = {}
+for index, row in artistsDf.iterrows():
+    artistRowList = str(row[0]).split(",")
+    for a in artistRowList:
+        if a in artistsList:
+            artistsList[a] += 1
+        else:
+            artistsList[a] = 1
+artistsDf = pd.DataFrame(artistsList.items(), columns=["Artist", "Count"]).sort_values("Count").iloc[::-1]
+
+buildRanking("Most common artists",
+        df=artistsDf,
+        rankedColumn="Artist",
+        sortingColumn="Count",
+        xLabel="Count",
+        color=DataColors.ARTIST)
+buildRanking("Least common artists",
+        df=artistsDf,
+        rankedColumn="Artist",
+        sortingColumn="Count",
+        least=True,
+        xLabel="Count",
+        color=DataColors.ARTIST)
 
 # Basic ranking
 rankingColumns = ["POPULARITY", "LOUDNESS", "TEMPO"] + percentageColumnsAllCaps
