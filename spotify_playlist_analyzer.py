@@ -96,6 +96,9 @@ currentDir = os.getcwd()
 tempDir = os.path.join(currentDir, "temp")
 globalOutDir = os.path.join(currentDir, "out")
 
+playlistFileNoExtension = os.path.splitext(sys.argv[1])[0]
+playlistFileName = os.path.split(playlistFileNoExtension)[-1]
+
 if os.path.exists(tempDir):
     shutil.rmtree(tempDir)
 
@@ -104,7 +107,7 @@ os.mkdir(tempDir)
 if not os.path.exists(globalOutDir):
     os.mkdir(globalOutDir)
 
-outDir = os.path.join(globalOutDir, datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f"))
+outDir = os.path.join(globalOutDir, datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f") + "_" + playlistFileName)
 os.mkdir(outDir)
 
 
@@ -168,8 +171,6 @@ print("Setting up PDF...")
 
 # Setup PDF
 
-playlistFileNoExtension = os.path.splitext(sys.argv[1])[0]
-playlistFileName = os.path.split(playlistFileNoExtension)[1]
 pdfName = "stats_playlist_" + playlistFileName + ".pdf"
 pdf = PdfPages(os.path.join(outDir, pdfName))
 pdfPageSize = (math_utils.mmToInches(210), math_utils.mmToInches(148)) # A5
