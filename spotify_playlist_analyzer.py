@@ -100,7 +100,7 @@ playlistFileNoExtension = os.path.splitext(sys.argv[1])[0] # [path, ext]
 playlistFileName = os.path.split(playlistFileNoExtension)[-1]
 
 if os.path.splitext(sys.argv[1])[1] != ".csv":
-    print("File is not a CSV file.")
+    print("File is not a CSV file: ", sys.argv[1])
     exit(1)
 
 if os.path.exists(tempDir):

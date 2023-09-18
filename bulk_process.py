@@ -45,7 +45,7 @@ for entry in csvList:
 
     if os.path.isfile(path) and extension == ".csv":
         print(f"=== ({i} / {total}) === processing: {entry}")
-        subprocess.call(f"py spotify_playlist_analyzer.py {path}", shell=True)
+        subprocess.call(f"py spotify_playlist_analyzer.py \"{path}\"", shell=True)
     else:
         print(f"=== ({i} / {total}) === ignoring: {entry}")
 
