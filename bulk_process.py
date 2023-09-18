@@ -37,12 +37,16 @@ if not os.path.exists(sys.argv[1]):
 
 csvList = os.listdir(sys.argv[1])
 
+i = 1
+total = len(csvList)
 for entry in csvList:
     path = os.path.join(sys.argv[1], entry)
     extension = os.path.splitext(path)[1]
 
     if os.path.isfile(path) and extension == ".csv":
-        print("=== processing: ", entry)
+        print(f"=== ({i} / {total}) === processing: {entry}")
         subprocess.call(f"py spotify_playlist_analyzer.py {path}", shell=True)
     else:
-        print("=== ignoring: ", entry)
+        print(f"=== ({i} / {total}) === ignoring: {entry}")
+
+    i += 1
